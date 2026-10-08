@@ -1,12 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script defer src="client.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boss Fight</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="client.js" defer></script>
 </head>
 <body>
+  <header>
+    <h1>Boss Fight</h1>
+    <input id="playerName" placeholder="Your name">
+    <p id="message" class="message"></p>
+  </header>
 
+  <main>
+    <section id="selection">
+      <h2>Choose your monster</h2>
+      <div id="monsterList" class="card-list"></div>
+
+      <h2>Choose your weapon</h2>
+      <div id="weaponList" class="card-list"></div>
+
+      <button id="startBtn">Start fight</button>
+    </section>
+
+    <section id="fight" hidden>
+      <h2 id="result"></h2>
+
+      <h3 id="monsterName">...</h3>
+      <div class="bar"><div id="monsterBar" class="fill monster"></div></div>
+      <p id="monsterHp"></p>
+      <p id="monsterAttack"></p>
+
+      <h3 id="playerLabel">Hero</h3>
+      <div class="bar"><div id="playerBar" class="fill player"></div></div>
+      <p id="playerHp"></p>
+      <p id="currentWeapon"></p>
+
+      <button id="attackBtn">Attack!</button>
+      <button id="newFightBtn" hidden>New fight</button>
+
+      <h3>Battle Log</h3>
+      <ul id="log"></ul>
+    </section>
+  </main>
 </body>
 </html>
