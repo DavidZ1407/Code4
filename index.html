@@ -10,40 +10,52 @@
 <body>
   <header>
     <h1>Boss Fight</h1>
-    <input id="playerName" placeholder="Your name">
     <p id="message" class="message"></p>
   </header>
 
   <main>
-    <section id="selection">
-      <h2>Choose your monster</h2>
-      <div id="monsterList" class="card-list"></div>
+    <section id="login">
+      <h2>Saved players</h2>
+      <div id="playerList" class="card-list"></div>
+      <p id="noPlayers" hidden>No save games yet.</p>
 
-      <h2>Choose your weapon</h2>
-      <div id="weaponList" class="card-list"></div>
-
-      <button id="startBtn">Start fight</button>
+      <h2>New player</h2>
+      <input id="playerName" placeholder="Your name" maxlength="20">
+      <button id="loginBtn">Create & play</button>
     </section>
+    <div id="game" hidden>
+      <section id="hud">
+        <h3 id="playerLabel">Hero</h3>
+        <div class="bar"><div id="playerBar" class="fill player"></div></div>
+        <p id="playerHp"></p>
+        <p id="stats"></p>
+        <button id="healBtn">Drink potion</button>
+        <button id="buyPotionBtn">Buy potion</button>
+        <button id="logoutBtn">Switch player</button>
+      </section>
 
-    <section id="fight" hidden>
-      <h2 id="result"></h2>
+      <h2 id="banner" class="banner"></h2>
+      <section id="hub">
+        <h2>Your weapons</h2>
+        <div id="weaponList" class="card-list"></div>
 
-      <h3 id="monsterName">...</h3>
-      <div class="bar"><div id="monsterBar" class="fill monster"></div></div>
-      <p id="monsterHp"></p>
-      <p id="monsterAttack"></p>
+        <h2>Choose your monster</h2>
+        <div id="monsterList" class="card-list"></div>
+      </section>
+      <section id="fight" hidden>
+        <h3 id="monsterName">...</h3>
+        <div class="bar"><div id="monsterBar" class="fill monster"></div></div>
+        <p id="monsterHp"></p>
+        <p id="monsterAttack"></p>
+        <p id="currentWeapon"></p>
 
-      <h3 id="playerLabel">Hero</h3>
-      <div class="bar"><div id="playerBar" class="fill player"></div></div>
-      <p id="playerHp"></p>
-      <p id="currentWeapon"></p>
-
-      <button id="attackBtn">Attack!</button>
-      <button id="newFightBtn" hidden>New fight</button>
+        <button id="attackBtn">Attack!</button>
+        <button id="fleeBtn">Flee</button>
+      </section>
 
       <h3>Battle Log</h3>
       <ul id="log"></ul>
-    </section>
+    </div>
   </main>
 </body>
 </html>

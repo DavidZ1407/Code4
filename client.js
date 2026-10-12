@@ -1,7 +1,10 @@
 const SERVER = "http://localhost:3000";
 
-let selectedMonsterId = null;
-let selectedWeaponId = null;
+let playerId = Number(localStorage.getItem("playerId")) || null;
+let monsters = [];
+let pollTimer = null;
+
+const $ = (id) => document.getElementById(id);
 
 async function api(path, method = "GET", body) {
   const options = { method };
@@ -20,127 +23,193 @@ async function api(path, method = "GET", body) {
 }
 
 function showMessage(text) {
-  document.getElementById("message").textContent = text;
+  $("message").textContent = text;
 }
 
-function getPlayerName() {
-  return document.getElementById("playerName").value || "Hero";
+async function act(path, body = {}) {
+  const state = await api(path, "POST", { playerId, ...body });
+  if (state) render(state);
 }
 
-function renderChoices(containerId, items, statsText, onSelect) {
-  const container = document.getElementById(containerId);
+function setBar(barId, current, max) {
+  $(barId).style.width = `${(current / max) * 100}%`;
+}
+
+async function loginAs(name) {
+  const state = await api("/login", "POST", { name });
+  if (!state) return;
+  playerId = state.player.id;
+  localStorage.setItem("playerId", playerId);
+  $("playerName").value = "";
+  render(state);
+}
+
+function logout() {
+  localStorage.removeItem("playerId");
+  playerId = null;
+  render(null);
+}
+
+async function loadPlayer() {
+  if (!playerId) return render(null);
+  const state = await api(`/player?id=${playerId}`);
+  if (state) render(state);
+  else logout();
+}
+
+async function renderPlayerList() {
+  const players = (await api("/players")) || [];
+  const container = $("playerList");
   container.innerHTML = "";
+  $("noPlayers").hidden = players.length > 0;
 
-  for (const item of items) {
+  for (const p of players) {
     const card = document.createElement("button");
     card.className = "card";
 
     const title = document.createElement("strong");
-    title.textContent = item.name;
+    title.textContent = p.name;
 
     const stats = document.createElement("span");
-    stats.textContent = statsText(item);
+    stats.textContent = `${p.hp}/${p.maxHp} HP | ${p.gold} gold | ${p.wins} wins`;
 
     card.append(title, stats);
-    card.addEventListener("click", () => {
-      for (const other of container.children) other.classList.remove("selected");
-      card.classList.add("selected");
-      onSelect(item.id);
-    });
+    card.addEventListener("click", () => loginAs(p.name));
     container.appendChild(card);
   }
 }
 
-async function loadChoices() {
-  const monsters = await api("/monsters");
-  const weapons = await api("/weapons");
-  if (!monsters || !weapons) return;
+function renderWeapons(state) {
+  const container = $("weaponList");
+  container.innerHTML = "";
+  const equippedId = state.player.equippedWeaponId;
 
-  renderChoices(
-    "monsterList",
-    monsters,
-    (m) => `HP: ${m.hp} | Attack: ${m.attack}`,
-    (id) => { selectedMonsterId = id; },
-  );
-  renderChoices(
-    "weaponList",
-    weapons,
-    (w) => `Damage: ${w.minDamage}-${w.maxDamage}`,
-    (id) => { selectedWeaponId = id; },
-  );
+  for (const w of state.weapons) {
+    const card = document.createElement("div");
+    card.className = "card" + (w.id === equippedId ? " selected" : "");
+
+    const title = document.createElement("strong");
+    title.textContent = `${w.name} +${w.upgradeLevel}`;
+
+    const stats = document.createElement("span");
+    stats.textContent = `Damage: ${w.minDamage}-${w.maxDamage}`;
+
+    const equipBtn = document.createElement("button");
+    equipBtn.textContent = w.id === equippedId ? "Equipped" : "Equip";
+    equipBtn.disabled = w.id === equippedId;
+    equipBtn.addEventListener("click", () => act("/equip", { weaponId: w.id }));
+
+    const upgradeBtn = document.createElement("button");
+    upgradeBtn.textContent = w.upgradeCost === null ? "Max level" : `Upgrade (${w.upgradeCost} gold)`;
+    upgradeBtn.disabled = w.upgradeCost === null || state.player.gold < w.upgradeCost;
+    upgradeBtn.addEventListener("click", () => act("/upgrade", { weaponId: w.id }));
+
+    card.append(title, stats, equipBtn, upgradeBtn);
+    container.appendChild(card);
+  }
 }
 
-async function startFight() {
-  const game = await api("/start", "POST", {
-    monsterId: selectedMonsterId,
-    weaponId: selectedWeaponId,
-    player: getPlayerName(),
-  });
-  if (game) renderGame(game);
+function renderMonsters(state) {
+  const container = $("monsterList");
+  container.innerHTML = "";
+
+  for (const m of monsters) {
+    const card = document.createElement("button");
+    card.className = "card";
+    card.disabled = state.player.hp <= 0;
+
+    const title = document.createElement("strong");
+    title.textContent = m.name;
+
+    const stats = document.createElement("span");
+    stats.textContent = `HP: ${m.hp} | Attack: ${m.attack}`;
+
+    const rewards = document.createElement("span");
+    rewards.textContent = `Reward: ${m.goldMin}-${m.goldMax} gold, ${m.potionChance}% potion`;
+
+    card.append(title, stats, rewards);
+    card.addEventListener("click", () => act("/start", { monsterId: m.id }));
+    container.appendChild(card);
+  }
 }
 
-async function attack() {
-  const game = await api("/attack", "POST");
-  if (game) renderGame(game);
-}
+function render(state) {
+  const loggedIn = Boolean(state);
+  $("login").hidden = loggedIn;
+  $("game").hidden = !loggedIn;
 
-async function resetGame() {
-  const game = await api("/reset", "POST");
-  if (game) renderGame(game);
-}
-
-async function loadGame() {
-  const game = await api("/game");
-  if (game) renderGame(game);
-}
-
-function setBar(barId, current, max) {
-  document.getElementById(barId).style.width = `${(current / max) * 100}%`;
-}
-
-function renderGame(game) {
-  const idle = game.status === "idle";
-  const fighting = game.status === "fighting";
-
-  document.getElementById("selection").hidden = !idle;
-  document.getElementById("fight").hidden = idle;
-
-  if (!idle) {
-    const { monster, player, weapon } = game;
-
-    document.getElementById("monsterName").textContent = monster.name;
-    document.getElementById("monsterHp").textContent = `${monster.hp} / ${monster.maxHp} HP`;
-    document.getElementById("monsterAttack").textContent = `Attack: ${monster.attack}`;
-    setBar("monsterBar", monster.hp, monster.maxHp);
-
-    document.getElementById("playerLabel").textContent = player.name;
-    document.getElementById("playerHp").textContent = `${player.hp} / ${player.maxHp} HP`;
-    document.getElementById("currentWeapon").textContent =
-      `Weapon: ${weapon.name} (${weapon.minDamage}-${weapon.maxDamage} damage)`;
-    setBar("playerBar", player.hp, player.maxHp);
-
-    const result = document.getElementById("result");
-    result.textContent = game.status === "won" ? "Victory!" : game.status === "lost" ? "Defeat!" : "";
+  if (!loggedIn) {
+    stopPolling();
+    renderPlayerList();
+    return;
   }
 
-  const attackBtn = document.getElementById("attackBtn");
-  attackBtn.disabled = !fighting || game.auto;
-  attackBtn.textContent = game.auto ? "Fighting..." : "Attack!";
-  document.getElementById("newFightBtn").hidden = fighting;
+  const { player, fight, weapons, log, config, auto, result } = state;
+  const fighting = Boolean(fight);
 
-  const list = document.getElementById("log");
+  $("playerLabel").textContent = player.name;
+  $("playerHp").textContent = `${player.hp} / ${player.maxHp} HP`;
+  setBar("playerBar", player.hp, player.maxHp);
+  $("stats").textContent =
+    `Gold: ${player.gold} | Potions: ${player.potions} | Wins: ${player.wins} | Losses: ${player.losses}`;
+  $("healBtn").textContent = `Drink potion (+${config.potionHeal} HP)`;
+  $("healBtn").disabled = fighting || player.potions < 1 || player.hp >= player.maxHp;
+  $("buyPotionBtn").textContent = `Buy potion (${config.potionPrice} gold)`;
+  $("buyPotionBtn").disabled = fighting || player.gold < config.potionPrice;
+
+  $("banner").textContent = result;
+
+  $("hub").hidden = fighting;
+  $("fight").hidden = !fighting;
+
+  if (fighting) {
+    const weapon = weapons.find((w) => w.id === player.equippedWeaponId);
+    $("monsterName").textContent = fight.name;
+    $("monsterHp").textContent = `${fight.hp} / ${fight.maxHp} HP`;
+    $("monsterAttack").textContent = `Attack: ${fight.attack}`;
+    setBar("monsterBar", fight.hp, fight.maxHp);
+    $("currentWeapon").textContent =
+      `Weapon: ${weapon.name} +${weapon.upgradeLevel} (${weapon.minDamage}-${weapon.maxDamage} damage)`;
+  } else {
+    renderWeapons(state);
+    renderMonsters(state);
+  }
+
+  $("attackBtn").disabled = !fighting || auto;
+  $("attackBtn").textContent = auto ? "Fighting..." : "Attack!";
+  $("fleeBtn").disabled = !fighting;
+
+  if (fighting) startPolling();
+  else stopPolling();
+
+  const list = $("log");
   list.innerHTML = "";
-  for (const entry of game.log) {
+  for (const entry of log) {
     const li = document.createElement("li");
     li.textContent = entry;
     list.appendChild(li);
   }
 }
 
-document.getElementById("startBtn").addEventListener("click", startFight);
-document.getElementById("attackBtn").addEventListener("click", attack);
-document.getElementById("newFightBtn").addEventListener("click", resetGame);
+function startPolling() {
+  if (!pollTimer) pollTimer = setInterval(loadPlayer, 1000);
+}
 
-loadChoices();
-loadGame();
-setInterval(loadGame, 1000);
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+$("loginBtn").addEventListener("click", () => loginAs($("playerName").value));
+$("playerName").addEventListener("keydown", (e) => { if (e.key === "Enter") loginAs($("playerName").value); });
+$("logoutBtn").addEventListener("click", logout);
+$("healBtn").addEventListener("click", () => act("/potion"));
+$("buyPotionBtn").addEventListener("click", () => act("/buy-potion"));
+$("attackBtn").addEventListener("click", () => act("/attack"));
+$("fleeBtn").addEventListener("click", () => act("/flee"));
+
+async function init() {
+  monsters = (await api("/monsters")) || [];
+  await loadPlayer();
+}
+init();
